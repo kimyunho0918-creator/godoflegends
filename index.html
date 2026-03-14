@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주식의 신 - v31.0 High Tempo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Inter:wght@400;700;900&display=swap');
+
+        :root {
+            --bg-base: #000;
+            --bg-side: #0a0a0a;
+            --primary: #fbbf24;
+            --up: #ff3344;
+            --down: #3388ff;
+            --border: #1a1a1a;
+        }
+
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--bg-base); color: #fff; font-family: 'Inter', sans-serif; overflow: hidden; }
+
+        #lobby, #overlay { position: fixed; inset: 0; z-index: 10000; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.98); }
+        .start-btn { margin-top: 20px; padding: 20px 80px; font-size: 2rem; font-weight: 900; background: var(--primary); border: none; border-radius: 60px; cursor: pointer; transition: 0.2s; }
+        .start-btn:active { transform: scale(0.95); }
+
+        #game-container { display: none; width: 100%; height: 100%; flex-direction: row; }
+
+        /* [좌측] 종목 리스트 */
+        .side-stocks { width: 240px; background: var(--bg-side); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .stock-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .stock-item { 
+            padding: 18px 15px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; 
+            font-size: 1.1rem; font-weight: 700; display: flex; justify-content: space-between; 
+            align-items: center; border: 2px solid transparent; background: #111;
+        }
+        .stock-item.active { background: #1a1a1a; border-color: var(--primary); color: var(--primary); }
+
+        /* [중앙] 맥시멈 차트 */
+        .center-main { flex: 1; position: relative; background: #000; display: flex; flex-direction: column; }
+        .chart-info-overlay { position: absolute; top: 0; left: 0; width: 100%; padding: 30px; pointer-events: none; z-index: 5; display: flex; justify-content: space-between; }
+        #cur-price { font-size: 7.5rem; font-weight: 900; letter-spacing: -6px; line-height: 0.8; margin-top: 15px; transition: color 0.1s; }
+        
+        .chart-wrapper { flex: 1; width: 100%; position: relative; }
+        canvas { width: 100% !important; height: 100% !important; }
+
+        /* [우측] 정보 및 매매 */
+        .side-info { width: 300px; background: var(--bg-side); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+        .stat-bar { padding: 25px; border-bottom: 1px solid var(--border); background: #050505; }
+        .sect { flex: 1; overflow-y: auto; padding: 20px; border-bottom: 1px solid var(--border); }
+        .sect-label { font-size: 0.8rem; font-weight: 900; color: #444; text-transform: uppercase; margin-bottom: 15px; display: block; }
+        
+        .port-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #111; font-size: 0.95rem; }
+
+        .trade-zone { padding: 20px; background: #000; }
+        .btn { width: 100%; padding: 20px; border: none; border-radius: 8px; font-weight: 900; cursor: pointer; font-size: 1.2rem; }
+        input { width: 100%; background: #111; border: 1px solid #222; color: #fff; padding: 18px; margin-bottom: 12px; text-align: center; font-size: 1.5rem; font-weight: 700; border-radius: 8px; }
+
+        .news-box { text-align: left; background: #111; padding: 18px; border-radius: 12px; margin-bottom: 12px; border-left: 5px solid #444; }
+        .news-box.good { border-left-color: var(--up); }
+        .news-box.bad { border-left-color: var(--down); }
+
+        .up { color: var(--up) !important; }
+        .down { color: var(--down) !important; }
+        .flash-up { animation: flash-red 0.2s; }
+        .flash-down { animation: flash-blue 0.2s; }
+        @keyframes flash-red { from { background: rgba(255, 51, 68, 0.2); } to { background: transparent; } }
+        @keyframes flash-blue { from { background: rgba(51, 136, 255, 0.2); } to { background: transparent; } }
+    </style>
+</head>
+<body>
+
+<div id="lobby">
+    <h1 style="font-family:'Black Han Sans'; font-size:7rem; color:var(--primary); margin:0;">주식의 신</h1>
+    <p style="letter-spacing:15px; color:#444; font-weight:900;">HIGH TEMPO EDITION</p>
+    <button class="start-btn" onclick="startGame()">시장 진입</button>
+</div>
+
+<div id="overlay" style="display:none;">
+    <div style="width:550px; padding:40px; border:1px solid var(--border); background:#0a0a0a; text-align:center; border-radius:20px;">
+        <h2 id="over-title" style="color:var(--primary); margin-top:0;">시장 마감 브리핑</h2>
+        <div id="news-container"></div>
+        <button class="btn" style="background:#fff; color:#000; margin-top:20px;" onclick="handleNextDay()">다음 날 개장 (빠른 진행)</button>
+    </div>
+</div>
+
+<div id="game-container">
+    <aside class="side-stocks">
+        <div style="padding:20px; border-bottom:1px solid var(--border);">
+            <div style="font-size:1.8rem; font-weight:900; color:var(--primary);">
+                Day <span id="day-val">1</span> <span style="color:#222; font-size:1.2rem;">/ 30</span>
+            </div>
+        </div>
+        <div class="stock-list" id="stock-menu"></div>
+    </aside>
+
+    <main class="center-main" id="main-display">
+        <div class="chart-info-overlay">
+            <div>
+                <div id="cur-name" style="color:#444; font-weight:900; letter-spacing:4px; font-size:1.2rem;">STOCK</div>
+                <div id="cur-price">0</div>
+                <div id="cur-diff" style="font-size:2rem; font-weight:800;">0.00%</div>
+            </div>
+            <div style="text-align:right;">
+                <div style="color:#444; font-weight:900; font-size:0.9rem;">REMAINING</div>
+                <div id="timer-val" style="font-size:3rem; font-weight:900; color:var(--up);">20s</div>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="chart"></canvas></div>
+    </main>
+
+    <aside class="side-info">
+        <div class="stat-bar">
+            <small style="color:#444; font-weight:800;">CASH</small>
+            <div id="cash-val" style="font-size:1.5rem; font-weight:900; margin-bottom:15px;">0</div>
+            <small style="color:#444; font-weight:800;">TOTAL ASSET</small>
+            <div id="asset-val" style="font-size:1.5rem; font-weight:900; color:var(--primary);">0</div>
+        </div>
+        <div class="sect">
+            <span class="sect-label">Portfolio</span>
+            <div id="port-list"></div>
+        </div>
+        <div class="trade-zone">
+            <input type="number" id="qty-input" value="10" min="1">
+            <div style="display:flex; gap:8px;">
+                <button class="btn" style="background:var(--up); color:#fff;" onclick="trade('buy')">매수</button>
+                <button class="btn" style="background:var(--down); color:#fff;" onclick="trade('sell')">매도</button>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<script>
+    const names = ["삼성전자", "현대차", "테슬라", "비트코인", "SK하이닉스", "NAVER", "카카오", "에코프로", "LG엔솔", "쿠팡", "애플", "엔비디아", "구글", "넷플릭스", "대한항공", "하이브", "넥슨", "이마트", "포스코", "엔씨소프트"];
+    const stocks = {};
+    let current = '삼성전자', cash = 10000000, day = 1, timeLeft = 20, isLive = false, chartObj;
+    let pendingNews = [];
+
+    const newsPool = [
+        { t: "초전도체 상용화 성공?", c: "기술 혁신으로 주가가 미친 듯이 날뜁니다.", m: 1.45, type: "good" },
+        { t: "역대 최대 흑자 달성", c: "시장 예측치를 300% 상회하는 실적입니다.", m: 1.30, type: "good" },
+        { t: "글로벌 펀드 대규모 매수", c: "외인들의 강력한 매수세가 유입됩니다.", m: 1.20, type: "good" },
+        { t: "회계 조작 스캔들", c: "신뢰도 추락으로 투매물량이 쏟아집니다.", m: 0.60, type: "bad" },
+        { t: "대규모 리콜 사태", c: "품질 이슈로 인해 막대한 배상금이 예상됩니다.", m: 0.70, type: "bad" },
+        { t: "유동성 위기 파산 경고", c: "자금 흐름이 막히며 상장 폐지 위기설이 돕니다.", m: 0.65, type: "bad" }
+    ];
+
+    names.forEach(n => {
+        const p = Math.floor(Math.random() * 400000) + 20000;
+        stocks[n] = { name: n, price: p, initPrice: p, owned: 0, avg: 0, history: Array(60).fill(p) };
+    });
+
+    function startGame() {
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('game-container').style.display = 'flex';
+        isLive = true; init();
+    }
+
+    function init() {
+        const menu = document.getElementById('stock-menu');
+        Object.keys(stocks).forEach(k => {
+            const div = document.createElement('div');
+            div.className = `stock-item ${k === current ? 'active' : ''}`;
+            div.id = `item-${k}`;
+            div.onclick = () => { current = k; document.querySelectorAll('.stock-item').forEach(e => e.classList.remove('active')); div.classList.add('active'); updateChart(true); };
+            div.innerHTML = `<span>${k}</span><span id="p-${k}">${stocks[k].price.toLocaleString()}</span>`;
+            menu.appendChild(div);
+        });
+
+        const ctx = document.getElementById('chart').getContext('2d');
+        chartObj = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: Array(60).fill(''), datasets: [{ data: [], backgroundColor: d => d.raw && d.raw[1] >= d.raw[0] ? '#ff3344' : '#3388ff', barPercentage: 0.98 }] },
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                layout: { padding: { top: 200, bottom: 20 } },
+                scales: { x: { display: false }, y: { position: 'right', grid: { display: false }, ticks: { color: '#111' }, beginAtZero: false, grace: '5%' } },
+                plugins: { legend: false }, animation: false 
+            }
+        });
+        // 틱 주기를 1초로 단축 (High Tempo)
+        setInterval(tick, 1000);
+        updateUI();
+    }
+
+    function tick() {
+        if(!isLive) return;
+        timeLeft--;
+        document.getElementById('timer-val').innerText = `${timeLeft}s`;
+        if(timeLeft <= 0) { endDay(); return; }
+
+        Object.keys(stocks).forEach(k => {
+            const s = stocks[k], old = s.price;
+            // 변동 폭을 ±2.5%로 대폭 확대
+            const change = (Math.random() * 0.05 - 0.025);
+            s.price = Math.floor(s.price * (1 + change));
+            s.history.push(s.price); s.history.shift();
+            
+            const el = document.getElementById(`p-${k}`);
+            if(el) { el.innerText = s.price.toLocaleString(); el.className = s.price >= old ? 'up' : 'down'; }
+            
+            if(k === current) {
+                const main = document.getElementById('main-display');
+                main.classList.remove('flash-up', 'flash-down');
+                void main.offsetWidth; // 리플로우 강제
+                main.classList.add(s.price >= old ? 'flash-up' : 'flash-down');
+            }
+        });
+        updateChart(); updateUI();
+    }
+
+    function endDay() {
+        isLive = false;
+        const newsCont = document.getElementById('news-container');
+        newsCont.innerHTML = '';
+        pendingNews = [];
+
+        const shuffled = Object.keys(stocks).sort(() => 0.5 - Math.random()).slice(0, 3);
+        shuffled.forEach(target => {
+            const news = newsPool[Math.floor(Math.random() * newsPool.length)];
+            pendingNews.push({ target, news });
+            const div = document.createElement('div');
+            div.className = `news-box ${news.type}`;
+            div.innerHTML = `<b class="${news.type === 'good' ? 'up' : 'down'}">[${target}] ${news.t}</b><br><small style="color:#888">${news.c}</small>`;
+            newsCont.appendChild(div);
+        });
+        document.getElementById('overlay').style.display = 'flex';
+    }
+
+    function handleNextDay() {
+        pendingNews.forEach(item => {
+            const s = stocks[item.target];
+            s.price = Math.floor(s.price * item.news.m);
+            s.history.push(s.price); s.history.shift();
+        });
+        day++; timeLeft = 20;
+        document.getElementById('day-val').innerText = day;
+        document.getElementById('overlay').style.display = 'none';
+        if(day > 30) { alert("게임 종료!"); location.reload(); } else { isLive = true; updateChart(true); }
+    }
+
+    function updateChart(force = false) {
+        const s = stocks[current], diff = ((s.price - s.initPrice) / s.initPrice * 100).toFixed(2);
+        chartObj.data.datasets[0].data = s.history.map((v, i) => [i === 0 ? v : s.history[i-1], v]);
+        chartObj.update(force ? 'default' : 'none');
+        document.getElementById('cur-name').innerText = s.name;
+        document.getElementById('cur-price').innerText = s.price.toLocaleString();
+        document.getElementById('cur-price').className = s.price >= s.history[s.history.length-2] ? 'up' : 'down';
+        const diffEl = document.getElementById('cur-diff');
+        diffEl.innerText = (diff >= 0 ? '+' : '') + diff + '%';
+        diffEl.className = diff >= 0 ? 'up' : 'down';
+    }
+
+    function trade(type) {
+        if(!isLive) return;
+        const s = stocks[current], q = parseInt(document.getElementById('qty-input').value);
+        if(isNaN(q) || q <= 0) return;
+        if(type === 'buy') { if(cash < s.price * q) return; cash -= s.price * q; s.avg = ((s.avg * s.owned) + (s.price * q)) / (s.owned + q); s.owned += q; }
+        else { if(s.owned < q) return; cash += s.price * q; s.owned -= q; if(s.owned === 0) s.avg = 0; }
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('cash-val').innerText = "₩" + cash.toLocaleString();
+        let total = cash; 
+        const port = document.getElementById('port-list'); port.innerHTML = '';
+        Object.keys(stocks).forEach(k => {
+            const s = stocks[k]; total += s.price * s.owned;
+            if(s.owned > 0) {
+                const profit = ((s.price - s.avg) / s.avg * 100).toFixed(2);
+                port.innerHTML += `<div class="port-item"><div><b>${s.name}</b><br><small style="color:#888">${s.owned}주</small></div><span class="${profit>=0?'up':'down'}">${profit>=0?'+':''}${profit}%</span></div>`;
+            }
+        });
+        document.getElementById('asset-val').innerText = "₩" + total.toLocaleString();
+    }
+</script>
+</body>
+</html>
