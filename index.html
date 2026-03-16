@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>주식의 신 - v45.0 Masterpiece</title>
+    <title>주식의 신 - v46.0 Custom Leverage</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Inter:wght@400;600;800;900&display=swap');
@@ -21,74 +21,45 @@
         }
 
         * { box-sizing: border-box; outline: none; margin: 0; padding: 0; }
-        body, html { 
-            width: 100%; height: 100%; background: var(--bg-base); 
-            color: var(--text-main); font-family: 'Inter', sans-serif; overflow: hidden; 
-        }
+        body, html { width: 100%; height: 100%; background: var(--bg-base); color: var(--text-main); font-family: 'Inter', sans-serif; overflow: hidden; }
 
-        /* [핵심] 완벽하게 분할된 Grid 레이아웃 */
-        #app-grid {
-            display: none; /* 로비 화면 이후 flex로 전환됨 (코드 내에서는 display: grid 로 설정) */
-            grid-template-columns: 260px 1fr 320px;
-            width: 100vw; height: 100vh;
-        }
+        /* Grid 레이아웃 */
+        #app-grid { display: none; grid-template-columns: 260px 1fr 320px; width: 100vw; height: 100vh; }
 
-        /* --- 공통 열(Column) 구조 --- */
         .col { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         .col-left { border-right: 1px solid var(--border); background: var(--bg-panel); }
         .col-center { background: var(--bg-base); }
         .col-right { border-left: 1px solid var(--border); background: var(--bg-panel); }
 
-        /* 공통 헤더/푸터 (절대 줄어들지 않음) */
         .panel-header { padding: 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
         .panel-footer { padding: 20px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg-panel); }
-        
-        /* 공통 스크롤 영역 (이 안에서만 스크롤됨) */
         .scroll-area { flex: 1; overflow-y: auto; padding: 10px; min-height: 0; }
 
-        /* --- UI 컴포넌트 --- */
-        .stock-card {
-            padding: 15px; margin-bottom: 8px; border-radius: 8px; background: var(--bg-card);
-            cursor: pointer; border: 1px solid transparent; transition: 0.15s ease;
-        }
+        /* 컴포넌트 */
+        .stock-card { padding: 15px; margin-bottom: 8px; border-radius: 8px; background: var(--bg-card); cursor: pointer; border: 1px solid transparent; transition: 0.15s ease; }
         .stock-card:hover { background: #1a1a1a; }
         .stock-card.active { border-color: var(--primary); background: #1a1a1a; }
-        
-        .port-card {
-            padding: 15px; margin-bottom: 10px; border-radius: 8px; background: var(--bg-card);
-            display: flex; justify-content: space-between; align-items: center; border: 1px solid #1a1a1a;
-        }
+        .port-card { padding: 15px; margin-bottom: 10px; border-radius: 8px; background: var(--bg-card); display: flex; justify-content: space-between; align-items: center; border: 1px solid #1a1a1a; }
 
-        .btn { 
-            width: 100%; padding: 15px; border: none; border-radius: 8px; 
-            font-weight: 900; cursor: pointer; font-size: 1.1rem; transition: 0.1s; 
-            display: flex; justify-content: center; align-items: center;
-        }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: 900; cursor: pointer; font-size: 1.1rem; transition: 0.1s; display: flex; justify-content: center; align-items: center; }
         .btn:active { transform: scale(0.98); }
         .btn-up { background: var(--up); color: #fff; }
         .btn-down { background: var(--down); color: #fff; }
+        .btn-sm { padding: 10px; font-size: 0.9rem; }
         
-        input[type="number"] { 
-            width: 100%; background: #000; border: 1px solid #333; color: #fff; 
-            padding: 15px; text-align: center; font-size: 1.3rem; border-radius: 8px; font-weight: 900; 
-        }
+        input[type="number"] { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 15px; text-align: center; font-size: 1.3rem; border-radius: 8px; font-weight: 900; }
 
-        /* --- 중앙 차트 영역 --- */
-        .chart-top-bar {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 25px 40px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-            background: linear-gradient(to bottom, #111, #000);
-        }
+        /* 중앙 차트 */
+        .chart-top-bar { display: flex; justify-content: space-between; align-items: center; padding: 25px 40px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: linear-gradient(to bottom, #111, #000); }
         .chart-wrapper { flex: 1; padding: 20px; position: relative; min-height: 0; }
         canvas { width: 100% !important; height: 100% !important; }
 
-        /* --- 타이포그래피 --- */
+        /* 텍스트 & 모달 */
         .t-dim { color: var(--text-dim); font-size: 0.8rem; font-weight: 800; letter-spacing: 1px; }
         .t-up { color: var(--up); } .t-down { color: var(--down); }
         .t-price { font-size: 4.5rem; font-weight: 900; letter-spacing: -2px; line-height: 1; }
         .t-diff { font-size: 1.6rem; font-weight: 800; padding: 5px 12px; border-radius: 6px; display: inline-block; margin-top: 10px; }
 
-        /* --- 모달 및 토스트 --- */
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
         .toast { background: rgba(20,20,20,0.95); border-left: 4px solid var(--primary); padding: 15px 25px; border-radius: 8px; font-weight: 800; box-shadow: 0 5px 20px rgba(0,0,0,0.8); animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
@@ -97,7 +68,6 @@
         .modal-overlay { position: fixed; inset: 0; z-index: 1000; display: none; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.95); backdrop-filter: blur(5px); }
         .modal-box { width: 500px; padding: 40px; background: #0a0a0a; border: 1px solid #333; border-radius: 20px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
         
-        /* 스크롤바 미관 정리 */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
     </style>
@@ -108,10 +78,10 @@
 
 <div id="lobby" class="modal-overlay" style="display:flex;">
     <h1 style="font-family:'Black Han Sans'; font-size:7.5rem; color:var(--primary); margin-bottom:10px;">주식의 신</h1>
-    <p class="t-dim" style="letter-spacing:8px; margin-bottom:40px;">PERFECT GRID v45.0</p>
+    <p class="t-dim" style="letter-spacing:8px; margin-bottom:40px;">CUSTOM LEVERAGE v46.0</p>
     <div style="display:flex; gap:15px;">
-        <button class="btn" style="width:200px; background:#222; color:#fff;" onclick="Engine.start('normal')">NORMAL MODE</button>
-        <button class="btn" style="width:200px; background:var(--up); color:#fff;" onclick="Engine.start('fast')">⚡ FAST MODE</button>
+        <button class="btn" style="width:200px; background:#222; color:#fff;" onclick="Engine.start('normal')">NORMAL</button>
+        <button class="btn" style="width:200px; background:var(--up); color:#fff;" onclick="Engine.start('fast')">⚡ FAST</button>
     </div>
 </div>
 
@@ -141,7 +111,6 @@
     <div class="modal-box" style="border-color:var(--primary);">
         <h1 style="color:var(--primary); font-family:'Black Han Sans'; font-size:3rem; margin-bottom:5px;">INVESTMENT REPORT</h1>
         <p class="t-dim">30일 투자가 성공적으로 종료되었습니다.</p>
-        
         <div style="margin:30px 0; background:#000; padding:30px; border-radius:12px; border:1px solid #222;">
             <div class="t-dim" style="margin-bottom:5px;">최종 평가 자산</div>
             <div id="final-asset" style="font-size:2.5rem; font-weight:900; color:#fff;">₩0</div>
@@ -156,18 +125,32 @@
 </div>
 
 <div id="bank-overlay" class="modal-overlay">
-    <div class="modal-box" style="width:400px;">
+    <div class="modal-box" style="width:450px;">
         <h2 style="color:var(--primary); margin-bottom:10px; font-weight:900;">🏦 제1금융권</h2>
-        <p class="t-dim" style="margin-bottom:25px; line-height:1.5;">매일 장 마감 시 대출 원금의 <b style="color:#fff;">2%</b>가<br>이자로 자동 차감됩니다.</p>
-        <div style="background:#000; padding:25px; border-radius:12px; margin-bottom:20px; border:1px solid #222;">
+        <p class="t-dim" style="margin-bottom:20px; line-height:1.5;">매일 장 마감 시 대출 원금의 <b style="color:#fff;">2%</b>가<br>이자로 자동 차감됩니다.</p>
+        
+        <div style="background:#000; padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid #222;">
             <div class="t-dim" style="margin-bottom:5px;">현재 대출 잔액</div>
             <div id="bank-loan-amount" style="font-size:2.2rem; font-weight:900; color:var(--up);">₩0</div>
+            <div class="t-dim" style="margin-top:15px; margin-bottom:5px;">보유 현금</div>
+            <div id="bank-cash-amount" style="font-size:1.2rem; font-weight:900; color:#fff;">₩0</div>
         </div>
+
+        <div style="margin-bottom:20px;">
+            <input type="number" id="bank-input" value="1000000" step="100000" style="margin-bottom:10px;">
+            <div style="display:flex; gap:5px; justify-content:center;">
+                <button class="btn btn-sm" style="background:#222; color:#aaa; flex:1;" onclick="Bank.setInput(1000000)">+100만</button>
+                <button class="btn btn-sm" style="background:#222; color:#aaa; flex:1;" onclick="Bank.setInput(5000000)">+500만</button>
+                <button class="btn btn-sm" style="background:#222; color:#aaa; flex:1;" onclick="Bank.setInput(10000000)">+1000만</button>
+                <button class="btn btn-sm" style="background:#222; color:var(--primary); flex:1;" onclick="Bank.setInput('all')">전액</button>
+            </div>
+        </div>
+
         <div style="display:flex; gap:10px; margin-bottom:15px;">
-            <button class="btn" style="background:#222; color:#fff; font-size:0.95rem; padding:12px;" onclick="Bank.borrow()">+ 100만 대출</button>
-            <button class="btn" style="background:#222; color:#fff; font-size:0.95rem; padding:12px;" onclick="Bank.repay()">- 100만 상환</button>
+            <button class="btn btn-up" style="padding:15px;" onclick="Bank.borrow()">대출받기</button>
+            <button class="btn btn-down" style="padding:15px;" onclick="Bank.repay()">상환하기</button>
         </div>
-        <button class="btn" style="background:var(--primary); color:#000; padding:12px;" onclick="Bank.close()">닫기</button>
+        <button class="btn" style="background:transparent; border:1px solid #444; color:#fff; padding:12px;" onclick="Bank.close()">닫기</button>
     </div>
 </div>
 
@@ -177,8 +160,7 @@
             <div style="color:var(--primary); font-weight:900; font-size:0.85rem;">DAY <span id="ui-day">1</span> / 30</div>
             <div style="font-weight:900; font-size:1.2rem; margin-top:5px; color:#fff;">MARKET LIST</div>
         </div>
-        <div class="scroll-area" id="ui-stock-list">
-            </div>
+        <div class="scroll-area" id="ui-stock-list"></div>
     </aside>
 
     <main class="col col-center">
@@ -193,9 +175,7 @@
                 <div id="ui-timer" style="font-size:3.5rem; font-weight:900; color:var(--primary);">20s</div>
             </div>
         </div>
-        <div class="chart-wrapper">
-            <canvas id="chart-canvas"></canvas>
-        </div>
+        <div class="chart-wrapper"><canvas id="chart-canvas"></canvas></div>
     </main>
 
     <aside class="col col-right">
@@ -205,18 +185,13 @@
                 <span id="ui-loan-display" style="font-size:0.75rem; color:var(--up); font-weight:900; display:none;">대출: ₩0</span>
             </div>
             <div id="ui-cash" style="font-size:1.8rem; font-weight:900; color:#fff;">₩10,000,000</div>
-            
             <div class="t-dim" style="margin-top:20px; margin-bottom:5px;">NET WORTH</div>
             <div id="ui-total-asset" style="font-size:1.8rem; font-weight:900; color:var(--primary);">₩10,000,000</div>
-            
             <button class="btn" style="margin-top:20px; background:#1a1a1a; color:var(--primary); font-size:0.9rem; padding:12px; border:1px solid #333;" onclick="Bank.open()">🏦 은행 업무 (대출/상환)</button>
         </div>
-        
-        <div class="scroll-area" id="ui-portfolio">
-            </div>
-        
+        <div class="scroll-area" id="ui-portfolio"></div>
         <div class="panel-footer">
-            <input type="number" id="trade-qty" value="10" min="1">
+            <input type="number" id="trade-qty" value="10" min="1" style="margin-bottom:10px;">
             <div style="display:flex; gap:10px;">
                 <button class="btn btn-up" onclick="Trading.execute('buy')">매수</button>
                 <button class="btn btn-down" onclick="Trading.execute('sell')">매도</button>
@@ -226,18 +201,14 @@
 </div>
 
 <script>
-// 유틸리티
 function showToast(msg, type = 'error') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.className = `toast`; 
-    toast.style.borderLeftColor = type === 'success' ? '#00ff88' : 'var(--up)';
-    toast.innerText = msg;
-    container.appendChild(toast);
+    toast.className = `toast`; toast.style.borderLeftColor = type === 'success' ? '#00ff88' : 'var(--up)';
+    toast.innerText = msg; container.appendChild(toast);
     setTimeout(() => { if(toast.parentElement) toast.remove(); }, 3000);
 }
 
-// 1. 시장 데이터 (35개 종목 유지)
 const Stocks = {
     list: {},
     names: [
@@ -248,13 +219,9 @@ const Stocks = {
     ],
     init() {
         this.names.forEach(n => {
-            // 가격과 변동성을 랜덤하게 주어 각기 다른 특성을 지니게 함
             const p = Math.floor(Math.random() * 250000) + 10000;
-            const r = (Math.random() * 0.04) + 0.01; // 0.01 ~ 0.05 고유 변동성
-            this.list[n] = {
-                name: n, price: p, basePrice: p, history: Array(60).fill(p), volume: Array(60).fill(0),
-                owned: 0, avgPrice: 0, vol: r
-            };
+            const r = (Math.random() * 0.04) + 0.01;
+            this.list[n] = { name: n, price: p, basePrice: p, history: Array(60).fill(p), volume: Array(60).fill(0), owned: 0, avgPrice: 0, vol: r };
         });
     },
     update(v) {
@@ -267,23 +234,52 @@ const Stocks = {
     }
 };
 
+// [강화된 은행 로직]
 const Bank = {
     loan: 0, interestRate: 0.02,
     open() { this.updateUI(); document.getElementById('bank-overlay').style.display = 'flex'; },
     close() { document.getElementById('bank-overlay').style.display = 'none'; },
-    updateUI() { document.getElementById('bank-loan-amount').innerText = "₩" + this.loan.toLocaleString(); },
+    
+    // 금액 버튼 클릭 시 입력창 업데이트
+    setInput(val) {
+        if(val === 'all') document.getElementById('bank-input').value = this.loan;
+        else {
+            const current = parseInt(document.getElementById('bank-input').value) || 0;
+            document.getElementById('bank-input').value = current + val;
+        }
+    },
+    
+    updateUI() { 
+        document.getElementById('bank-loan-amount').innerText = "₩" + this.loan.toLocaleString(); 
+        document.getElementById('bank-cash-amount').innerText = "₩" + Trading.cash.toLocaleString();
+    },
+    
     borrow() {
-        Trading.cash += 1000000; this.loan += 1000000;
-        showToast('100만 원 대출이 실행되었습니다.', 'success');
+        const amount = parseInt(document.getElementById('bank-input').value);
+        if(isNaN(amount) || amount <= 0) return showToast('올바른 대출 금액을 입력하세요.');
+        
+        Trading.cash += amount; 
+        this.loan += amount;
+        showToast(`₩${amount.toLocaleString()} 대출 승인`, 'success');
         this.updateUI(); UI.render();
     },
+    
     repay() {
         if(this.loan <= 0) return showToast('상환할 대출금이 없습니다.');
-        if(Trading.cash < 1000000) return showToast('보유 현금이 부족합니다.');
-        Trading.cash -= 1000000; this.loan -= 1000000;
-        showToast('100만 원을 상환했습니다.', 'success');
+        
+        let amount = parseInt(document.getElementById('bank-input').value);
+        if(isNaN(amount) || amount <= 0) return showToast('올바른 상환 금액을 입력하세요.');
+        
+        // 똑똑한 방어 로직: 남은 빚보다 많이 입력하면 전액 상환으로 퉁침
+        if(amount > this.loan) amount = this.loan;
+        if(Trading.cash < amount) return showToast('보유 현금이 부족합니다.');
+        
+        Trading.cash -= amount; 
+        this.loan -= amount;
+        showToast(`₩${amount.toLocaleString()} 상환 완료`, 'success');
         this.updateUI(); UI.render();
     },
+    
     chargeInterest() {
         if(this.loan > 0) {
             const interest = Math.floor(this.loan * this.interestRate);
@@ -305,9 +301,7 @@ const Trading = {
         const total = s.price * qty;
         if(type === 'buy') {
             if(this.cash < total) return showToast("주문 거부: 현금이 부족합니다.");
-            this.cash -= total;
-            s.avgPrice = ((s.avgPrice * s.owned) + total) / (s.owned + qty);
-            s.owned += qty;
+            this.cash -= total; s.avgPrice = ((s.avgPrice * s.owned) + total) / (s.owned + qty); s.owned += qty;
         } else {
             if(s.owned < qty) return showToast("주문 거부: 보유 수량이 부족합니다.");
             this.cash += total; s.owned -= qty; if(s.owned === 0) s.avgPrice = 0;
@@ -323,7 +317,6 @@ const Reservation = {
         const name = document.getElementById('res-target').value, qty = parseInt(document.getElementById('res-qty').value);
         if(isNaN(qty) || qty <= 0) return;
         const s = Stocks.list[name], cost = s.price * qty;
-
         if(type === 'buy') {
             if((Trading.cash - this.getReservedCash()) < cost) return showToast("예약 실패: 가용 현금 부족");
         } else {
@@ -409,6 +402,11 @@ const UI = {
         if(Bank.loan > 0) { loanEl.style.display = 'inline'; loanEl.innerText = `대출: ₩${Bank.loan.toLocaleString()}`; } 
         else { loanEl.style.display = 'none'; }
 
+        // 은행 모달이 열려있으면 그쪽 현금도 동기화
+        if(document.getElementById('bank-overlay').style.display === 'flex') {
+            document.getElementById('bank-cash-amount').innerText = "₩" + Trading.cash.toLocaleString();
+        }
+
         const port = document.getElementById('ui-portfolio'); port.innerHTML = '';
         Object.values(Stocks.list).forEach(s => {
             if(s.owned > 0) {
@@ -432,7 +430,6 @@ const Engine = {
         this.globalVol = mode === 'fast' ? 0.04 : 0.015; this.maxTime = mode === 'fast' ? 15 : 30;
         Stocks.init(); UI.init(); this.resetDay();
         document.getElementById('lobby').style.display = 'none'; 
-        // flex가 아닌 grid로 활성화
         document.getElementById('app-grid').style.display = 'grid'; 
         this.isLive = true; setInterval(() => this.tick(), mode === 'fast' ? 800 : 1500);
     },
@@ -449,7 +446,7 @@ const Engine = {
         shuffled.forEach(n => {
             const up = Math.random() > 0.45; const s = Stocks.list[n];
             s.nextM = up ? (1 + (Math.random() * 0.1 * (1 + s.vol*3))) : (1 - (Math.random() * 0.1 * (1 + s.vol*3)));
-            const newsText = up ? '글로벌 시장 점유율 대폭 확대 전망' : '예상치 못한 악재 발생, 투자심리 위축';
+            const newsText = up ? '글로벌 펀드 대규모 매수 확인' : '경영 리스크 불거지며 주가 하락 주의보';
             list.innerHTML += `<div style="text-align:left; padding:15px; background:#000; border-radius:10px; margin-bottom:10px; border-left:4px solid ${up?'var(--up)':'var(--down)'}">
                 <b class="${up?'t-up':'t-down'}">[${n}]</b> ${newsText}</div>`;
         });
