@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>주식의 신 - v44.0 Bank UI & Roster</title>
+    <title>주식의 신 - v44.1 Layout Fixed</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Inter:wght@400;700;900&display=swap');
@@ -15,7 +15,7 @@
             --up: #ff3344;
             --down: #3388ff;
             --border: #222;
-            --glass: rgba(15, 15, 15, 0.95);
+            --glass: rgba(15, 15, 15, 0.98);
         }
 
         * { box-sizing: border-box; outline: none; }
@@ -29,13 +29,16 @@
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
 
-        /* 레이아웃 */
+        /* [상하 비율 레이아웃 수정] */
         #game-container { display: none; width: 100vw; height: 100vh; flex-direction: row; }
         .sidebar-left { width: 220px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
-        .main-viewport { flex: 1; display: flex; flex-direction: column; background: radial-gradient(circle at center, #111 0%, #000 100%); position: relative; }
-        .price-header { padding: 30px 40px; display: flex; justify-content: space-between; background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%); position: absolute; top: 0; left: 0; width: 100%; z-index: 10; }
-        .chart-container { flex: 1; width: 100%; padding-top: 130px; position: relative; }
+        
+        .main-viewport { flex: 1; display: flex; flex-direction: column; background: #050505; }
+        /* 헤더가 겹치지 않고 독립적인 공간을 차지하도록 변경 (상하 비율 안정화) */
+        .price-header { padding: 30px 40px; display: flex; justify-content: space-between; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
+        .chart-container { flex: 1; width: 100%; padding: 20px; position: relative; }
         canvas { width: 100% !important; height: 100% !important; }
+        
         .sidebar-right { width: 300px; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
 
         /* UI 컴포넌트 */
@@ -43,14 +46,19 @@
         .stock-card:hover { background: #1a1a1a; }
         .stock-card.active { border-color: var(--primary); background: #1a1a1a; box-shadow: inset 0 0 10px rgba(251,191,36,0.05); }
         
-        #ui-cur-price { font-size: 6rem; font-weight: 900; letter-spacing: -3px; line-height: 0.9; margin-top: 10px; text-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-        #ui-cur-diff { font-size: 1.8rem; font-weight: 800; padding: 5px 15px; border-radius: 8px; display: inline-block; margin-top: 10px; }
-        #ui-timer { font-size: 3.5rem; font-weight: 900; color: var(--primary); text-shadow: 0 0 20px rgba(251,191,36,0.4); }
+        #ui-cur-price { font-size: 5rem; font-weight: 900; letter-spacing: -3px; line-height: 1; margin-top: 10px; }
+        #ui-cur-diff { font-size: 1.6rem; font-weight: 800; padding: 5px 15px; border-radius: 8px; display: inline-block; margin-top: 10px; }
+        #ui-timer { font-size: 3rem; font-weight: 900; color: var(--primary); text-shadow: 0 0 15px rgba(251,191,36,0.3); }
 
         .panel-section { padding: 20px; border-bottom: 1px solid var(--border); background: var(--bg-panel); }
-        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: 900; cursor: pointer; font-size: 1.1rem; transition: 0.2s; }
+        
+        /* 공통 버튼 & 입력창 (비율 맞춤) */
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: 900; cursor: pointer; font-size: 1.1rem; transition: 0.2s; display: flex; justify-content: center; align-items: center; }
         .btn:active { transform: scale(0.97); }
+        .btn-sm { padding: 12px; font-size: 0.95rem; } /* 모달용 작은 버튼 */
+
         input[type="number"] { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 15px; text-align: center; font-size: 1.3rem; border-radius: 8px; font-weight: 900; }
+        input[type="number"].input-sm { padding: 12px; font-size: 1.1rem; margin: 0; } /* 모달용 작은 입력창 */
 
         /* 모달 및 로비 */
         .modal-overlay { position: fixed; inset: 0; z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.92); backdrop-filter: blur(5px); }
@@ -70,7 +78,7 @@
 
 <div id="lobby" class="modal-overlay" style="display:flex;">
     <h1 style="font-family:'Black Han Sans'; font-size:8rem; color:var(--primary); margin:0; text-shadow: 0 0 30px rgba(251,191,36,0.3);">주식의 신</h1>
-    <p style="color:#555; font-weight:900; letter-spacing:8px; margin-bottom:40px;">MEGA ROSTER v44.0</p>
+    <p style="color:#555; font-weight:900; letter-spacing:8px; margin-bottom:40px;">PRO TRADER v44.1</p>
     <div style="display:flex; gap:20px;">
         <button class="btn" style="width:220px; background:#222; color:#fff;" onclick="Engine.start('normal')">NORMAL</button>
         <button class="btn" style="width:220px; background:var(--up); color:#fff;" onclick="Engine.start('fast')">⚡ FAST</button>
@@ -88,8 +96,8 @@
         </div>
         
         <div style="display:flex; gap:10px; margin-bottom:15px;">
-            <button class="btn" style="background:#222; color:#fff; font-size:0.95rem;" onclick="Bank.borrow()">+ 100만 대출</button>
-            <button class="btn" style="background:#222; color:#fff; font-size:0.95rem;" onclick="Bank.repay()">- 100만 상환</button>
+            <button class="btn btn-sm" style="background:#222; color:#fff;" onclick="Bank.borrow()">+ 100만 대출</button>
+            <button class="btn btn-sm" style="background:#222; color:#fff;" onclick="Bank.repay()">- 100만 상환</button>
         </div>
         <button class="btn" style="background:var(--primary); color:#000;" onclick="Bank.close()">은행 나가기</button>
     </div>
@@ -105,11 +113,12 @@
                 <span class="dim">예약 가능 현금</span>
                 <span id="res-available-cash" class="up">₩0</span>
             </div>
-            <select id="res-target" style="width:100%; padding:15px; background:#111; color:#fff; border:1px solid #333; border-radius:8px; margin-bottom:10px;"></select>
-            <div style="display:flex; gap:10px;">
-                <input type="number" id="res-qty" value="10" style="flex:1; margin:0;">
-                <button class="btn" style="width:80px; background:var(--up); font-size:0.9rem; padding:0;" onclick="Reservation.add('buy')">매수</button>
-                <button class="btn" style="width:80px; background:var(--down); font-size:0.9rem; padding:0;" onclick="Reservation.add('sell')">매도</button>
+            <select id="res-target" style="width:100%; padding:12px; background:#111; color:#fff; border:1px solid #333; border-radius:8px; margin-bottom:10px; outline:none; font-size:1rem;"></select>
+            
+            <div style="display:flex; gap:10px; align-items:stretch;">
+                <input type="number" id="res-qty" class="input-sm" value="10" min="1" style="flex:1;">
+                <button class="btn btn-sm" style="width:80px; background:var(--up); color:#fff;" onclick="Reservation.add('buy')">매수</button>
+                <button class="btn btn-sm" style="width:80px; background:var(--down); color:#fff;" onclick="Reservation.add('sell')">매도</button>
             </div>
             <div id="res-log" style="font-size:0.8rem; color:#888; margin-top:15px; text-align:left; border-top:1px solid #222; padding-top:10px; max-height:80px; overflow-y:auto;"></div>
         </div>
@@ -121,7 +130,6 @@
     <div class="modal-content" style="border-color:var(--primary); box-shadow: 0 0 80px rgba(251,191,36,0.2);">
         <h1 style="color:var(--primary); font-family:'Black Han Sans'; font-size:3rem; margin-top:0;">INVESTMENT REPORT</h1>
         <p class="dim" style="font-weight:900; letter-spacing:3px;">30일 투자가 종료되었습니다.</p>
-        
         <div style="margin:30px 0; background:#000; padding:30px; border-radius:15px; border:1px solid #222;">
             <div style="font-size:0.9rem; color:#555; margin-bottom:10px;">최종 평가 자산 (대출 상환 후)</div>
             <div id="final-asset" style="font-size:2.5rem; font-weight:900; color:#fff;">₩0</div>
@@ -147,7 +155,7 @@
     <main class="main-viewport">
         <div class="price-header">
             <div>
-                <div id="ui-cur-name" style="font-weight:900; color:#aaa; letter-spacing:3px;">STOCK</div>
+                <div id="ui-cur-name" style="font-weight:900; color:#666; letter-spacing:4px;">STOCK</div>
                 <div id="ui-cur-price">0</div>
                 <div id="ui-cur-diff" class="bg-up">0.00%</div>
             </div>
@@ -163,16 +171,17 @@
         <div class="panel-section">
             <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:5px;">
                 <span class="dim" style="font-size:0.75rem; font-weight:900;">CASH</span>
+                <span id="ui-loan-display" style="font-size:0.7rem; color:var(--up); font-weight:900; display:none;">대출: ₩0</span>
             </div>
             <div id="ui-cash" style="font-size:1.6rem; font-weight:900;">₩10,000,000</div>
             <p class="dim" style="font-size:0.75rem; font-weight:900; margin-top:15px; margin-bottom:5px;">NET WORTH</p>
             <div id="ui-total-asset" style="font-size:1.6rem; font-weight:900; color:var(--primary);">₩10,000,000</div>
             
-            <button class="btn" style="margin-top:20px; background:transparent; color:var(--primary); border:1px solid var(--primary); font-size:0.9rem; padding:12px;" onclick="Bank.open()">🏦 은행 업무 (대출/상환)</button>
+            <button class="btn btn-sm" style="margin-top:20px; background:transparent; color:var(--primary); border:1px solid var(--primary);" onclick="Bank.open()">🏦 은행 업무 (대출/상환)</button>
         </div>
         <div id="ui-portfolio" style="flex:1; overflow-y:auto; padding:20px;"></div>
         <div class="panel-section" style="background:#050505;">
-            <input type="number" id="trade-qty" value="10" min="1">
+            <input type="number" id="trade-qty" value="10" min="1" style="margin-bottom:10px;">
             <div style="display:flex; gap:10px;">
                 <button class="btn" style="background:var(--up); color:#fff;" onclick="Trading.execute('buy')">매수</button>
                 <button class="btn" style="background:var(--down); color:#fff;" onclick="Trading.execute('sell')">매도</button>
@@ -182,7 +191,7 @@
 </div>
 
 <script>
-// [토스트 메시지 유틸]
+// 유틸리티
 function showToast(msg, type = 'error') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
@@ -191,7 +200,6 @@ function showToast(msg, type = 'error') {
     setTimeout(() => { if(toast.parentElement) toast.remove(); }, 3000);
 }
 
-// 1. 시장 데이터 (종목 35개 대확장)
 const Stocks = {
     list: {},
     data: [
@@ -234,7 +242,6 @@ const Stocks = {
     }
 };
 
-// 2. 분리된 은행 시스템
 const Bank = {
     loan: 0, interestRate: 0.02,
     open() { this.updateUI(); document.getElementById('bank-overlay').style.display = 'flex'; },
@@ -261,7 +268,6 @@ const Bank = {
     }
 };
 
-// 3. 트레이딩 및 자산 관리
 const Trading = {
     cash: 10000000,
     getTotalAsset() {
@@ -285,7 +291,6 @@ const Trading = {
     }
 };
 
-// 4. 예약 시스템
 const Reservation = {
     queue: [],
     getReservedCash() { return this.queue.reduce((acc, q) => q.type === 'buy' ? acc + (Stocks.list[q.name].price * q.qty) : acc, 0); },
@@ -310,13 +315,12 @@ const Reservation = {
         this.queue.forEach(q => {
             const s = Stocks.list[q.name], total = s.price * q.qty;
             if(q.type === 'buy' && Trading.cash >= total) { Trading.cash -= total; s.avgPrice = ((s.avgPrice * s.owned) + total) / (s.owned + q.qty); s.owned += q.qty; } 
-            else if(q.type === 'sell' && s.owned >= q.qty) { Trading.cash += total; s.owned -= q.qty; }
+            else if(q.type === 'sell' && s.owned >= q.qty) { Trading.cash += total; s.owned -= q.qty; if(s.owned === 0) s.avgPrice = 0; }
         });
         this.queue = [];
     }
 };
 
-// 5. 차트 및 UI 렌더링
 const UI = {
     chart: null,
     init() {
@@ -349,7 +353,6 @@ const UI = {
             const div = document.createElement('div');
             div.className = `stock-card ${s.name === Engine.currentStock ? 'active' : ''}`;
             div.onclick = () => { Engine.currentStock = s.name; this.renderStockList(); this.updateChart(true); };
-            // 티어 태그 제거, 심플한 디자인
             div.innerHTML = `<div style="margin-bottom:4px;"><b style="color:#ddd">${s.name}</b></div><div id="price-tag-${s.name}" style="font-size:1.1rem; font-weight:900;">${s.price.toLocaleString()}</div>`;
             container.appendChild(div);
         });
@@ -374,6 +377,11 @@ const UI = {
     },
     render() {
         document.getElementById('ui-cash').innerText = "₩" + Trading.cash.toLocaleString();
+        
+        const loanEl = document.getElementById('ui-loan-display');
+        if(Bank.loan > 0) { loanEl.style.display = 'block'; loanEl.innerText = `대출금: ₩${Bank.loan.toLocaleString()}`; } 
+        else { loanEl.style.display = 'none'; }
+
         const port = document.getElementById('ui-portfolio'); port.innerHTML = '';
         Object.values(Stocks.list).forEach(s => {
             if(s.owned > 0) {
@@ -391,9 +399,8 @@ const UI = {
     }
 };
 
-// 6. 게임 엔진
 const Engine = {
-    day: 1, timeLeft: 30, isLive: false, currentStock: '삼성전자',
+    day: 1, timeLeft: 20, isLive: false, currentStock: '삼성전자',
     start(mode) {
         this.globalVol = mode === 'fast' ? 0.04 : 0.015; this.maxTime = mode === 'fast' ? 15 : 30;
         Stocks.init(); UI.init(); this.resetDay();
@@ -412,7 +419,7 @@ const Engine = {
         Stocks.data.sort(() => 0.5 - Math.random()).slice(0, 3).forEach(d => {
             const up = Math.random() > 0.45; const s = Stocks.list[d.n];
             s.nextM = up ? (1 + (Math.random() * 0.1 * (1 + s.vol*3))) : (1 - (Math.random() * 0.1 * (1 + s.vol*3)));
-            list.innerHTML += `<div class="news-item" style="border-left-color:${up?'var(--up)':'var(--down)'}"><b class="${up?'up':'down'}">[${d.n}]</b> ${up?'시장 전망 상회하는 호재 발생':'리스크 부각으로 인한 투심 악화'}</div>`;
+            list.innerHTML += `<div class="news-item" style="border-left-color:${up?'var(--up)':'var(--down)'}"><b class="${up?'up':'down'}">[${d.n}]</b> ${up?'시장 기대치 상회하는 빅뉴스':'경영 리스크 부각 및 하락 경고'}</div>`;
         });
         Reservation.updateUI(); document.getElementById('day-overlay').style.display = 'flex';
     },
