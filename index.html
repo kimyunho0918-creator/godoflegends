@@ -110,7 +110,7 @@
 <div id="result-overlay" class="modal-overlay">
     <div class="modal-box" style="border-color:var(--primary);">
         <h1 style="color:var(--primary); font-family:'Black Han Sans'; font-size:3rem; margin-bottom:5px;">INVESTMENT REPORT</h1>
-        <p class="t-dim">30일 투자가 성공적으로 종료되었습니다.</p>
+        <p class="t-dim">30일 투자가 종료되었습니다.</p>
         <div style="margin:30px 0; background:#000; padding:30px; border-radius:12px; border:1px solid #222;">
             <div class="t-dim" style="margin-bottom:5px;">최종 평가 자산</div>
             <div id="final-asset" style="font-size:2.5rem; font-weight:900; color:#fff;">₩0</div>
@@ -125,15 +125,22 @@
 </div>
 
 <div id="bank-overlay" class="modal-overlay">
-    <div class="modal-box" style="width:450px;">
+    <div class="modal-box" style="width:480px;">
         <h2 style="color:var(--primary); margin-bottom:10px; font-weight:900;">🏦 제1금융권</h2>
-        <p class="t-dim" style="margin-bottom:20px; line-height:1.5;">매일 장 마감 시 대출 원금의 <b style="color:#fff;">2%</b>가<br>이자로 자동 차감됩니다.</p>
+        <p class="t-dim" style="margin-bottom:20px; line-height:1.6;">
+            매일 장 마감 시 대출 원금의 <b style="color:#fff;">2%</b>가 이자로 차감됩니다.<br>
+            <span style="color:var(--primary); font-weight:bold;">⚠️ 대출은 1회만 가능 (한도: 현재 총자산의 100%)</span><br>
+            <span style="color:var(--up); font-weight:bold;">⚠️ 종료일까지 미상환 시 즉시 파산 처리됩니다.</span>
+        </p>
         
         <div style="background:#000; padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid #222;">
-            <div class="t-dim" style="margin-bottom:5px;">현재 대출 잔액</div>
-            <div id="bank-loan-amount" style="font-size:2.2rem; font-weight:900; color:var(--up);">₩0</div>
-            <div class="t-dim" style="margin-top:15px; margin-bottom:5px;">보유 현금</div>
-            <div id="bank-cash-amount" style="font-size:1.2rem; font-weight:900; color:#fff;">₩0</div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <div class="t-dim" style="margin-bottom:5px;">현재 대출 잔액</div>
+                <div id="bank-max-loan" class="t-dim" style="color:var(--primary); font-weight:bold;">대출 한도: ₩0</div>
+            </div>
+            <div id="bank-loan-amount" style="font-size:2.2rem; font-weight:900; color:var(--up); text-align:left;">₩0</div>
+            <div class="t-dim" style="margin-top:15px; margin-bottom:5px; text-align:left;">보유 현금</div>
+            <div id="bank-cash-amount" style="font-size:1.2rem; font-weight:900; color:#fff; text-align:left;">₩0</div>
         </div>
 
         <div style="margin-bottom:20px;">
@@ -234,61 +241,6 @@ const Stocks = {
     }
 };
 
-// [강화된 은행 로직]
-const Bank = {
-    loan: 0, interestRate: 0.02,
-    open() { this.updateUI(); document.getElementById('bank-overlay').style.display = 'flex'; },
-    close() { document.getElementById('bank-overlay').style.display = 'none'; },
-    
-    // 금액 버튼 클릭 시 입력창 업데이트
-    setInput(val) {
-        if(val === 'all') document.getElementById('bank-input').value = this.loan;
-        else {
-            const current = parseInt(document.getElementById('bank-input').value) || 0;
-            document.getElementById('bank-input').value = current + val;
-        }
-    },
-    
-    updateUI() { 
-        document.getElementById('bank-loan-amount').innerText = "₩" + this.loan.toLocaleString(); 
-        document.getElementById('bank-cash-amount').innerText = "₩" + Trading.cash.toLocaleString();
-    },
-    
-    borrow() {
-        const amount = parseInt(document.getElementById('bank-input').value);
-        if(isNaN(amount) || amount <= 0) return showToast('올바른 대출 금액을 입력하세요.');
-        
-        Trading.cash += amount; 
-        this.loan += amount;
-        showToast(`₩${amount.toLocaleString()} 대출 승인`, 'success');
-        this.updateUI(); UI.render();
-    },
-    
-    repay() {
-        if(this.loan <= 0) return showToast('상환할 대출금이 없습니다.');
-        
-        let amount = parseInt(document.getElementById('bank-input').value);
-        if(isNaN(amount) || amount <= 0) return showToast('올바른 상환 금액을 입력하세요.');
-        
-        // 똑똑한 방어 로직: 남은 빚보다 많이 입력하면 전액 상환으로 퉁침
-        if(amount > this.loan) amount = this.loan;
-        if(Trading.cash < amount) return showToast('보유 현금이 부족합니다.');
-        
-        Trading.cash -= amount; 
-        this.loan -= amount;
-        showToast(`₩${amount.toLocaleString()} 상환 완료`, 'success');
-        this.updateUI(); UI.render();
-    },
-    
-    chargeInterest() {
-        if(this.loan > 0) {
-            const interest = Math.floor(this.loan * this.interestRate);
-            Trading.cash -= interest;
-            showToast(`대출 이자 ₩${interest.toLocaleString()} 차감`);
-        }
-    }
-};
-
 const Trading = {
     cash: 10000000,
     getTotalAsset() {
@@ -307,6 +259,69 @@ const Trading = {
             this.cash += total; s.owned -= qty; if(s.owned === 0) s.avgPrice = 0;
         }
         UI.render();
+    }
+};
+
+// [업데이트된 은행 로직]
+const Bank = {
+    loan: 0, interestRate: 0.02, hasBorrowed: false, // 1회 대출 여부 추적
+    
+    getMaxLoan() { return Trading.getTotalAsset(); }, // 현재 총자산의 100%를 한도로 설정
+
+    open() { this.updateUI(); document.getElementById('bank-overlay').style.display = 'flex'; },
+    close() { document.getElementById('bank-overlay').style.display = 'none'; },
+    
+    setInput(val) {
+        if(val === 'all') document.getElementById('bank-input').value = this.loan;
+        else {
+            const current = parseInt(document.getElementById('bank-input').value) || 0;
+            document.getElementById('bank-input').value = current + val;
+        }
+    },
+    
+    updateUI() { 
+        document.getElementById('bank-loan-amount').innerText = "₩" + this.loan.toLocaleString(); 
+        document.getElementById('bank-cash-amount').innerText = "₩" + Trading.cash.toLocaleString();
+        document.getElementById('bank-max-loan').innerText = "대출 한도: ₩" + this.getMaxLoan().toLocaleString();
+    },
+    
+    borrow() {
+        if (this.hasBorrowed) return showToast('대출은 게임 진행 중 1회만 가능합니다.');
+
+        const amount = parseInt(document.getElementById('bank-input').value);
+        if(isNaN(amount) || amount <= 0) return showToast('올바른 대출 금액을 입력하세요.');
+        
+        const maxLimit = this.getMaxLoan();
+        if(amount > maxLimit) return showToast(`대출 한도 초과! (최대 ₩${maxLimit.toLocaleString()})`);
+        
+        Trading.cash += amount; 
+        this.loan += amount;
+        this.hasBorrowed = true; // 대출 이력 활성화
+        showToast(`₩${amount.toLocaleString()} 대출 승인`, 'success');
+        this.updateUI(); UI.render();
+    },
+    
+    repay() {
+        if(this.loan <= 0) return showToast('상환할 대출금이 없습니다.');
+        
+        let amount = parseInt(document.getElementById('bank-input').value);
+        if(isNaN(amount) || amount <= 0) return showToast('올바른 상환 금액을 입력하세요.');
+        
+        if(amount > this.loan) amount = this.loan;
+        if(Trading.cash < amount) return showToast('보유 현금이 부족합니다.');
+        
+        Trading.cash -= amount; 
+        this.loan -= amount;
+        showToast(`₩${amount.toLocaleString()} 상환 완료`, 'success');
+        this.updateUI(); UI.render();
+    },
+    
+    chargeInterest() {
+        if(this.loan > 0) {
+            const interest = Math.floor(this.loan * this.interestRate);
+            Trading.cash -= interest;
+            showToast(`대출 이자 ₩${interest.toLocaleString()} 차감`);
+        }
     }
 };
 
@@ -402,9 +417,9 @@ const UI = {
         if(Bank.loan > 0) { loanEl.style.display = 'inline'; loanEl.innerText = `대출: ₩${Bank.loan.toLocaleString()}`; } 
         else { loanEl.style.display = 'none'; }
 
-        // 은행 모달이 열려있으면 그쪽 현금도 동기화
         if(document.getElementById('bank-overlay').style.display === 'flex') {
             document.getElementById('bank-cash-amount').innerText = "₩" + Trading.cash.toLocaleString();
+            document.getElementById('bank-max-loan').innerText = "대출 한도: ₩" + Bank.getMaxLoan().toLocaleString();
         }
 
         const port = document.getElementById('ui-portfolio'); port.innerHTML = '';
@@ -457,22 +472,43 @@ const Engine = {
         Reservation.process(); this.day++; this.resetDay();
         document.getElementById('day-overlay').style.display = 'none'; this.isLive = true; UI.render(); UI.updateChart(true);
     },
+    
+    // [업데이트된 결과 로직 - 미상환 시 무조건 한강 지망생]
     showResult() {
         const total = Trading.getTotalAsset();
         const profit = ((total - 10000000) / 10000000 * 100).toFixed(2);
         let rank = "F", name = "한강 지망생", color = "#ff3344";
-        if(total >= 1000000000) { rank="S"; name="주식의 신"; color="#fbbf24"; }
-        else if(total >= 100000000) { rank="A"; name="워렌 버핏"; color="#fbbf24"; }
-        else if(total >= 30000000) { rank="B"; name="성공한 투자자"; color="#fff"; }
-        else if(total >= 10000000) { rank="C"; name="본전 개미"; color="#666"; }
+        let finalProfitDisplay = (profit >= 0 ? '+' : '') + profit + "%";
+        let profitClass = profit >= 0 ? 't-up' : 't-down';
+
+        // 대출 미상환 검사 (수익 여부와 무관하게 랭크 하향)
+        if (Bank.loan > 0) {
+            rank = "F"; 
+            name = "한강 지망생 (대출 미상환)"; 
+            color = "#ff3344";
+            finalProfitDisplay = "파산";
+            profitClass = 't-down';
+        } else {
+            if(total >= 1000000000) { rank="S"; name="주식의 신"; color="#fbbf24"; }
+            else if(total >= 100000000) { rank="A"; name="워렌 버핏"; color="#fbbf24"; }
+            else if(total >= 30000000) { rank="B"; name="성공한 투자자"; color="#fff"; }
+            else if(total >= 10000000) { rank="C"; name="본전 개미"; color="#666"; }
+        }
+
         document.getElementById('final-asset').innerText = "₩" + total.toLocaleString();
-        document.getElementById('final-profit').innerText = (profit >= 0 ? '+' : '') + profit + "%";
-        document.getElementById('final-profit').className = profit >= 0 ? 't-up' : 't-down';
-        document.getElementById('final-rank').innerText = "RANK " + rank; document.getElementById('final-rank').style.color = color;
-        document.getElementById('final-rank-name').innerText = name; document.getElementById('final-rank-name').style.color = color;
+        document.getElementById('final-profit').innerText = finalProfitDisplay;
+        document.getElementById('final-profit').className = profitClass;
+        
+        document.getElementById('final-rank').innerText = "RANK " + rank; 
+        document.getElementById('final-rank').style.color = color;
+        
+        document.getElementById('final-rank-name').innerText = name; 
+        document.getElementById('final-rank-name').style.color = color;
+        
         document.getElementById('result-overlay').style.display = 'flex';
     }
 };
 </script>
 </body>
 </html>
+
